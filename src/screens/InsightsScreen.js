@@ -17,8 +17,8 @@ const IS_WEB = Platform.OS === 'web';
 
 const FONT_FAMILY = IS_WEB ? '"Montserrat", system-ui, sans-serif' : undefined;
 
-// Arlo mascot image
-const arloImage = require('../../assets/arlo-waving.webp');
+// Metis mascot image
+const metisImage = require('../../assets/metis.webp');
 
 // --- Headline mapping ---
 function getConversationalHeadline(insight) {
@@ -56,134 +56,32 @@ function getConversationalHeadline(insight) {
 
 // --- Filter insights: high + medium, sorted high first ---
 const swipeInsights = insights
-  .filter((i) => i.severity === 'high' || i.severity === 'medium')
-  .sort((a, b) => {
-    if (a.severity === 'high' && b.severity !== 'high') return -1;
-    if (a.severity !== 'high' && b.severity === 'high') return 1;
-    return 0;
-  });
-
-// --- Arlo bobbing + wiggle animation hook (greeting/completion) ---
-function useArloBob() {
-  const bobY = useRef(new Animated.Value(0)).current;
-  const rotate = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    // Float up and down
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(bobY, { toValue: -14, duration: 1200, useNativeDriver: true }),
-        Animated.timing(bobY, { toValue: 14, duration: 1200, useNativeDriver: true }),
-      ])
-    ).start();
-
-    // Gentle tilt side to side
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(rotate, { toValue: 1, duration: 1600, useNativeDriver: true }),
-        Animated.timing(rotate, { toValue: -1, duration: 1600, useNativeDriver: true }),
-      ])
-    ).start();
-
-    // Breathe scale
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(scale, { toValue: 1.08, duration: 1400, useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 0.95, duration: 1400, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
-
-  const rotateInterp = rotate.interpolate({
-    inputRange: [-1, 1],
-    outputRange: ['-8deg', '8deg'],
-  });
-
-  return { bobY, rotate: rotateInterp, scale };
-}
-
-// --- Arlo pulse + wiggle animation hook (swipe cards) ---
-function useArloPulse() {
-  const scale = useRef(new Animated.Value(1)).current;
-  const rotate = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(scale, { toValue: 1.15, duration: 800, useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 0.95, duration: 800, useNativeDriver: true }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(rotate, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.timing(rotate, { toValue: -1, duration: 600, useNativeDriver: true }),
-        Animated.timing(rotate, { toValue: 0, duration: 400, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
-
-  const rotateInterp = rotate.interpolate({
-    inputRange: [-1, 1],
-    outputRange: ['-12deg', '12deg'],
-  });
-
-  return { scale, rotate: rotateInterp };
-}
+  .filter((i) => i.severity === 'high' || i.severity === 'medium');
 
 // ==================== GREETING SCREEN ====================
 function GreetingScreen({ onStart, insightCount }) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  const arlo = useArloBob();
-  const fadeIn = useRef(new Animated.Value(0)).current;
-  const slideUp = useRef(new Animated.Value(30)).current;
-  const buttonFade = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(fadeIn, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.timing(slideUp, { toValue: 0, duration: 800, useNativeDriver: true }),
-      ]),
-      Animated.timing(buttonFade, { toValue: 1, duration: 500, delay: 300, useNativeDriver: true }),
-    ]).start();
-  }, []);
-
   return (
     <View style={styles.fullScreen}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.greetingContent}>
-        {/* Arlo */}
-        <Animated.View style={{
-          transform: [
-            { translateY: arlo.bobY },
-            { rotate: arlo.rotate },
-            { scale: arlo.scale },
-          ],
-          marginBottom: 28,
-        }}>
-          <Image source={arloImage} style={styles.arloGreeting} resizeMode="contain" />
-        </Animated.View>
+        <View style={{ marginBottom: 28 }}>
+          <Image source={metisImage} style={styles.metisGreeting} resizeMode="contain" />
+        </View>
 
-        {/* Text */}
-        <Animated.View style={{ opacity: fadeIn, transform: [{ translateY: slideUp }] }}>
-          <Text style={styles.greetingText}>
-            {greeting}, here are{' '}
-            <Text style={styles.greetingHighlight}>{insightCount} insights</Text>
-            {' '}for Capital One UK today.
-          </Text>
-        </Animated.View>
+        <Text style={styles.greetingText}>
+          {greeting}, here are{' '}
+          <Text style={styles.greetingHighlight}>{insightCount} insights</Text>
+          {' '}for Capital One UK today.
+        </Text>
 
-        {/* Button */}
-        <Animated.View style={{ opacity: buttonFade, marginTop: 40 }}>
+        <View style={{ marginTop: 40 }}>
           <TouchableOpacity style={styles.startButton} onPress={onStart} activeOpacity={0.85}>
             <Text style={styles.startButtonText}>Start review</Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       </View>
     </View>
   );
@@ -191,32 +89,13 @@ function GreetingScreen({ onStart, insightCount }) {
 
 // ==================== COMPLETION SCREEN ====================
 function CompletionScreen({ actionedCount, onGoToActions }) {
-  const arlo = useArloBob();
-  const fadeIn = useRef(new Animated.Value(0)).current;
-  const dropIn = useRef(new Animated.Value(-80)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(dropIn, { toValue: 0, friction: 4, tension: 50, useNativeDriver: true }),
-      Animated.timing(fadeIn, { toValue: 1, duration: 600, useNativeDriver: true }),
-    ]).start();
-  }, []);
-
   return (
     <View style={styles.fullScreen}>
       <StatusBar barStyle="dark-content" />
-      <Animated.View style={[styles.greetingContent, { opacity: fadeIn }]}>
-        {/* Arlo celebrating */}
-        <Animated.View style={{
-          transform: [
-            { translateY: Animated.add(dropIn, arlo.bobY) },
-            { rotate: arlo.rotate },
-            { scale: arlo.scale },
-          ],
-          marginBottom: 28,
-        }}>
-          <Image source={arloImage} style={styles.arloComplete} resizeMode="contain" />
-        </Animated.View>
+      <View style={styles.greetingContent}>
+        <View style={{ marginBottom: 28 }}>
+          <Image source={metisImage} style={styles.metisComplete} resizeMode="contain" />
+        </View>
 
         <Text style={styles.completeTitle}>All caught up!</Text>
         {actionedCount > 0 && (
@@ -228,7 +107,7 @@ function CompletionScreen({ actionedCount, onGoToActions }) {
         <TouchableOpacity style={[styles.startButton, { marginTop: 36 }]} onPress={onGoToActions} activeOpacity={0.85}>
           <Text style={styles.startButtonText}>View actions</Text>
         </TouchableOpacity>
-      </Animated.View>
+      </View>
     </View>
   );
 }
@@ -260,8 +139,6 @@ function ProgressBar({ total, current, onNavigate }) {
 function InsightSwipeCard({ insight, index, total, onNext, onPrev, onNavigate, onAddToActions, onTriggerAgent, isActioned }) {
   const pan = useRef(new Animated.Value(0)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
-
-  const arloPulse = useArloPulse();
 
   useEffect(() => {
     pan.setValue(0);
@@ -302,16 +179,10 @@ function InsightSwipeCard({ insight, index, total, onNext, onPrev, onNavigate, o
         contentContainerStyle={styles.swipeScrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Arlo */}
-        <Animated.View style={{
-          transform: [
-            { scale: arloPulse.scale },
-            { rotate: arloPulse.rotate },
-          ],
-          marginBottom: 8,
-        }}>
-          <Image source={arloImage} style={styles.arloCard} resizeMode="contain" />
-        </Animated.View>
+        {/* Metis */}
+        <View style={{ marginBottom: 8 }}>
+          <Image source={metisImage} style={styles.metisCard} resizeMode="contain" />
+        </View>
 
         {/* Headline */}
         <Text style={styles.cardHeadline}>{headline}</Text>
@@ -537,7 +408,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     paddingBottom: 60,
   },
-  arloGreeting: {
+  metisGreeting: {
     width: 120,
     height: 120,
   },
@@ -568,7 +439,7 @@ const styles = StyleSheet.create({
   },
 
   // --- Completion ---
-  arloComplete: {
+  metisComplete: {
     width: 150,
     height: 150,
   },
@@ -624,7 +495,7 @@ const styles = StyleSheet.create({
   },
 
   // --- Card Arlo ---
-  arloCard: {
+  metisCard: {
     width: 40,
     height: 40,
   },
