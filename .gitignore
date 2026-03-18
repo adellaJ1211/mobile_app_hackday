@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.expo/
+.DS_Store
+*.tar
+*.png.bak
+Screenshot*.png
+actionable_insights*.csv
