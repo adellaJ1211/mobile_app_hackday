@@ -59,55 +59,48 @@ function DeliverableCard({ workflow, onMarkReviewed }) {
       {/* Prompt group */}
       <Text style={styles.promptGroup}>{workflow.promptGroup}</Text>
 
+      {/* Action buttons — always visible */}
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.actionBtn} onPress={handleCopy} activeOpacity={0.7}>
+          <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={14} color={colors.lime} />
+          <Text style={styles.actionBtnText}>{copied ? 'Copied!' : 'Copy'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
+          <Ionicons name="share-outline" size={14} color={colors.lime} />
+          <Text style={styles.actionBtnText}>Share</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
+          <Ionicons name="mail-outline" size={14} color={colors.lime} />
+          <Text style={styles.actionBtnText}>Email</Text>
+        </TouchableOpacity>
+        {!isReviewed && (
+          <TouchableOpacity style={styles.actionBtnReview} onPress={() => onMarkReviewed(workflow.id)} activeOpacity={0.7}>
+            <Ionicons name="checkmark" size={14} color={colors.navy} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Expandable content */}
+      {expanded && (
+        <ScrollView style={styles.contentScroll} nestedScrollEnabled>
+          {del.body.split('\n\n').map((paragraph, idx) => {
+            const trimmed = paragraph.trim();
+            if (!trimmed) return null;
+            if (trimmed === trimmed.toUpperCase() && trimmed.length < 60 && !trimmed.includes('£') && !trimmed.includes('%')) {
+              return null;
+            }
+            const lines = trimmed.split('\n');
+            if (lines.length === 1 && !trimmed.endsWith('.') && !trimmed.endsWith(')') && trimmed.length < 80 && !trimmed.startsWith('-') && !trimmed.match(/^\d+\./)) {
+              return <Text key={idx} style={styles.sectionTitle}>{trimmed}</Text>;
+            }
+            return <Text key={idx} style={styles.bodyText}>{trimmed}</Text>;
+          })}
+        </ScrollView>
+      )}
+
       {/* Preview (collapsed) */}
       {!expanded && (
         <Text style={styles.previewText} numberOfLines={2}>{del.body}</Text>
-      )}
-
-      {/* Full content (expanded) */}
-      {expanded && (
-        <View style={styles.fullContent}>
-          <ScrollView style={styles.contentScroll} nestedScrollEnabled>
-            {del.body.split('\n\n').map((paragraph, idx) => {
-              const trimmed = paragraph.trim();
-              if (!trimmed) return null;
-              // Simple heading detection
-              if (trimmed === trimmed.toUpperCase() && trimmed.length < 60 && !trimmed.includes('£') && !trimmed.includes('%')) {
-                return null; // skip all-caps lines as they're section titles handled below
-              }
-              // Section titles (short lines without punctuation at end)
-              const lines = trimmed.split('\n');
-              if (lines.length === 1 && !trimmed.endsWith('.') && !trimmed.endsWith(')') && trimmed.length < 80 && !trimmed.startsWith('-') && !trimmed.match(/^\d+\./)) {
-                return <Text key={idx} style={styles.sectionTitle}>{trimmed}</Text>;
-              }
-              return <Text key={idx} style={styles.bodyText}>{trimmed}</Text>;
-            })}
-          </ScrollView>
-
-          {/* Action buttons */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionBtn} onPress={handleCopy} activeOpacity={0.7}>
-              <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={14} color={colors.lime} />
-              <Text style={styles.actionBtnText}>{copied ? 'Copied!' : 'Copy'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
-              <Ionicons name="share-outline" size={14} color={colors.lime} />
-              <Text style={styles.actionBtnText}>Share</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
-              <Ionicons name="mail-outline" size={14} color={colors.lime} />
-              <Text style={styles.actionBtnText}>Email</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Mark as reviewed */}
-          {!isReviewed && (
-            <TouchableOpacity style={styles.reviewedBtn} onPress={() => onMarkReviewed(workflow.id)} activeOpacity={0.85}>
-              <Ionicons name="checkmark-circle" size={16} color={colors.navy} />
-              <Text style={styles.reviewedBtnText}>Mark as reviewed</Text>
-            </TouchableOpacity>
-          )}
-        </View>
       )}
 
       {/* Time */}
@@ -204,26 +197,23 @@ const styles = StyleSheet.create({
   promptGroup: { fontFamily: FONT_FAMILY, fontSize: 12, fontStyle: 'italic', color: colors.textMuted, marginBottom: 8 },
   previewText: { fontFamily: FONT_FAMILY, fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
 
-  // Full content
-  fullContent: { marginTop: 4 },
+  // Content
   contentScroll: { maxHeight: 400, backgroundColor: colors.bgCardElevated, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm },
   sectionTitle: { fontFamily: FONT_FAMILY, fontSize: 14, fontWeight: '700', color: colors.lime, marginTop: 12, marginBottom: 4 },
   bodyText: { fontFamily: FONT_FAMILY, fontSize: 13, color: colors.textPrimary, lineHeight: 20, marginBottom: 8 },
 
-  // Actions
-  actionRow: { flexDirection: 'row', gap: 8, marginBottom: spacing.sm },
+  // Actions — always visible
+  actionRow: { flexDirection: 'row', gap: 6, marginBottom: spacing.sm },
   actionBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    paddingVertical: 10, borderRadius: radius.full,
+    paddingVertical: 8, borderRadius: radius.full,
     borderWidth: 1, borderColor: colors.border,
   },
-  actionBtnText: { fontFamily: FONT_FAMILY, fontSize: 12, fontWeight: '600', color: colors.lime },
-
-  reviewedBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    paddingVertical: 12, borderRadius: radius.full, backgroundColor: colors.lime,
+  actionBtnText: { fontFamily: FONT_FAMILY, fontSize: 11, fontWeight: '600', color: colors.lime },
+  actionBtnReview: {
+    width: 36, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.lime,
   },
-  reviewedBtnText: { fontFamily: FONT_FAMILY, fontSize: 14, fontWeight: '700', color: colors.navy },
 
   timeText: { fontFamily: FONT_FAMILY, fontSize: 11, color: colors.textMuted, marginTop: 8 },
 });
