@@ -4,7 +4,7 @@ const WorkflowsContext = createContext();
 
 const stepLabels = {
   'content-brief': [
-    'Scanning LLM responses for gaps',
+    'Scanning LLM responses for content gaps',
     'Analysing competitor content strategies',
     'Identifying target topics and keywords',
     'Generating content brief',
@@ -17,21 +17,21 @@ const stepLabels = {
   ],
   'competitive-analysis': [
     'Mapping competitor mentions across LLMs',
-    'Analysing content driving citations',
-    'Scoring competitive positioning',
+    'Analysing content driving their citations',
+    'Scoring competitive positioning gaps',
     'Building competitive intelligence summary',
   ],
   'bid-adjustment': [
     'Pulling auction-level performance data',
-    'Modelling bid scenarios',
+    'Modelling bid adjustment scenarios',
     'Calculating ROI impact projections',
-    'Preparing bid adjustment recommendations',
+    'Preparing bid change recommendations',
   ],
   'report': [
     'Gathering weekly performance metrics',
     'Identifying key trends and changes',
-    'Formatting data for stakeholder view',
-    'Generating status slide content',
+    'Formatting for stakeholder review',
+    'Generating status report content',
   ],
 };
 

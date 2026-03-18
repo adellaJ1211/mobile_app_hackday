@@ -9,12 +9,52 @@ const IS_WEB = Platform.OS === 'web';
 const FONT_FAMILY = IS_WEB ? '"Montserrat", system-ui, sans-serif' : undefined;
 const arloImage = require('../../assets/arlo-waving.webp');
 
-const agentSteps = [
-  { label: 'Analysing insight data', duration: 1200 },
-  { label: 'Reviewing relevant sources', duration: 1500 },
-  { label: 'Generating recommendations', duration: 1800 },
-  { label: 'Preparing output for review', duration: 1000 },
+const stepLabels = {
+  'content-brief': [
+    'Scanning LLM responses for content gaps',
+    'Analysing competitor content strategies',
+    'Identifying target topics and keywords',
+    'Generating content brief',
+  ],
+  'investigation': [
+    'Collecting source attribution data',
+    'Cross-referencing competitor citations',
+    'Identifying patterns and anomalies',
+    'Compiling investigation report',
+  ],
+  'competitive-analysis': [
+    'Mapping competitor mentions across LLMs',
+    'Analysing content driving their citations',
+    'Scoring competitive positioning gaps',
+    'Building competitive intelligence summary',
+  ],
+  'bid-adjustment': [
+    'Pulling auction-level performance data',
+    'Modelling bid adjustment scenarios',
+    'Calculating ROI impact projections',
+    'Preparing bid change recommendations',
+  ],
+  'report': [
+    'Gathering weekly performance metrics',
+    'Identifying key trends and changes',
+    'Formatting for stakeholder review',
+    'Generating status report content',
+  ],
+};
+
+const defaultStepLabels = [
+  'Analysing insight data',
+  'Reviewing relevant sources',
+  'Generating recommendations',
+  'Preparing output for review',
 ];
+
+const STEP_DURATIONS = [1200, 1500, 1800, 1000];
+
+function getStepsForActionType(actionType) {
+  const labels = stepLabels[actionType] || defaultStepLabels;
+  return labels.map((label, i) => ({ label, duration: STEP_DURATIONS[i] }));
+}
 
 const agentResults = {
   'content-brief': 'Content brief generated with targeted recommendations. Identified 4 content gaps where competitors are being cited by LLMs.',
@@ -44,17 +84,18 @@ export default function AgentModal({ visible, insight, onClose, onApprove }) {
       Animated.timing(overlayOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
     ]).start();
 
+    const steps = getStepsForActionType(insight?.agentAction?.type);
     let step = 0;
     const advance = () => {
-      if (step < agentSteps.length - 1) {
+      if (step < steps.length - 1) {
         step += 1;
         setCurrentStep(step);
-        setTimeout(advance, agentSteps[step].duration);
+        setTimeout(advance, steps[step].duration);
       } else {
-        setTimeout(() => setCompleted(true), agentSteps[step].duration);
+        setTimeout(() => setCompleted(true), steps[step].duration);
       }
     };
-    setTimeout(advance, agentSteps[0].duration);
+    setTimeout(advance, steps[0].duration);
   }, [visible]);
 
   if (!insight && !visible) return null;
@@ -87,7 +128,7 @@ export default function AgentModal({ visible, insight, onClose, onApprove }) {
           </View>
 
           <View style={styles.steps}>
-            {agentSteps.map((step, idx) => {
+            {getStepsForActionType(insight?.agentAction?.type).map((step, idx) => {
               const isDone = completed || idx < currentStep;
               const isActive = !completed && idx === currentStep;
               return (

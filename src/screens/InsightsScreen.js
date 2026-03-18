@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme/colors';
 import { insights } from '../data/mockData';
 import AgentModal from '../components/AgentModal';
+import InsightCardVisual from '../components/InsightCardVisual';
 import { useActions } from '../context/ActionsContext';
 import { useWorkflows } from '../context/WorkflowsContext';
 
@@ -188,6 +189,7 @@ function InsightSwipeCard({ insight, index, total, onNext, onPrev, onNavigate, o
 
         {/* White detail card */}
         <View style={styles.detailCard}>
+          {/* Badges */}
           <View style={styles.typeBadgeRow}>
             <View style={[styles.typeBadge, { backgroundColor: isAISearch ? colors.aiSearchDim : colors.ppcDim }]}>
               <Ionicons name={isAISearch ? 'sparkles' : 'search'} size={11} color={isAISearch ? colors.aiSearch : colors.ppc} />
@@ -202,25 +204,8 @@ function InsightSwipeCard({ insight, index, total, onNext, onPrev, onNavigate, o
               </Text>
             </View>
           </View>
-
-          {insight.metric && (
-            <View style={styles.metricBox}>
-              <Text style={styles.metricLabel}>{insight.metric.label}</Text>
-              <View style={styles.metricValueRow}>
-                {insight.metric.before !== '-' && (
-                  <>
-                    <Text style={styles.metricBefore}>{insight.metric.before}</Text>
-                    <Ionicons name="arrow-forward" size={11} color={lt.bodyLight} />
-                  </>
-                )}
-                <Text style={[styles.metricAfter, { color: severityColor }]}>{insight.metric.after}</Text>
-                <Ionicons name={insight.metric.direction === 'up' ? 'trending-up' : 'trending-down'} size={15} color={severityColor} />
-              </View>
-            </View>
-          )}
-
-          <Text style={styles.cardSummary} numberOfLines={3}>{insight.summary}</Text>
-          <Text style={styles.cardPromptGroup}>{insight.promptGroup}</Text>
+          {/* Visual content per insight type */}
+          <InsightCardVisual insight={insight} />
         </View>
 
         {/* Stacked buttons */}
@@ -249,16 +234,6 @@ function InsightSwipeCard({ insight, index, total, onNext, onPrev, onNavigate, o
         </View>
       </ScrollView>
 
-      {/* Nav arrows */}
-      <View style={styles.navArrowRow}>
-        <TouchableOpacity onPress={onPrev} style={[styles.navArrow, index === 0 && styles.navArrowDisabled]} disabled={index === 0} activeOpacity={0.6}>
-          <Ionicons name="chevron-back" size={20} color={index === 0 ? '#D1D5DB' : lt.headline} />
-        </TouchableOpacity>
-        <Text style={styles.navCounter}>{index + 1} / {total}</Text>
-        <TouchableOpacity onPress={onNext} style={styles.navArrow} activeOpacity={0.6}>
-          <Ionicons name="chevron-forward" size={20} color={lt.headline} />
-        </TouchableOpacity>
-      </View>
     </Animated.View>
   );
 }
