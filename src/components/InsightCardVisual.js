@@ -1,11 +1,29 @@
-import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Platform, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '../theme/colors';
 
 const IS_WEB = Platform.OS === 'web';
 const F = IS_WEB ? '"Montserrat", system-ui, sans-serif' : undefined;
 const lt = colors.light;
+
+const brandDomains = {
+  'Barclaycard': 'barclaycard.co.uk',
+  'TSB': 'tsb.co.uk',
+  'HSBC': 'hsbc.co.uk',
+  'NerdWallet': 'nerdwallet.com',
+  'Experian': 'experian.co.uk',
+  'Equifax': 'equifax.co.uk',
+  'Capital One': 'capitalone.co.uk',
+  'Post Office': 'postoffice.co.uk',
+  'MoneySupermarket': 'moneysupermarket.com',
+};
+
+function getBrandLogoUrl(name) {
+  const domain = brandDomains[name];
+  if (!domain) return null;
+  return `https://logo.clearbit.com/${domain}`;
+}
 
 // --- Parsers ---
 function parseCompetitors(summary) {
@@ -17,19 +35,13 @@ function parseCompetitors(summary) {
   }).filter(Boolean).sort((a, b) => b.count - a.count);
 }
 
-function parseRate(summary, label) {
-  const re = new RegExp(label + '[:\\s]*([\\d.]+)%');
-  const m = summary.match(re);
-  return m ? parseFloat(m[1]) : null;
-}
-
 function parseMentionRate(summary) {
   const m = summary.match(/mentioned in ([\d.]+)% of citations/);
   return m ? parseFloat(m[1]) : null;
 }
 
 function parseSourceRate(summary) {
-  const m = summary.match(/(?:Own source rate|own domain cited in only)[:\\s]*([\d.]+)%/i);
+  const m = summary.match(/(?:Own source rate|own domain cited in only)[:\s]*([\d.]+)%/i);
   return m ? parseFloat(m[1]) : null;
 }
 
@@ -47,119 +59,133 @@ function parseRivals(summary) {
   }).filter(Boolean);
 }
 
-// --- Donut (View-based, web safe) ---
-function DonutChart({ percentage, size = 100, strokeWidth = 10, color = '#EF4444' }) {
-  const bgColor = '#E5E7EB';
-  const r = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * r;
-  // Use CSS conic-gradient on web for a clean donut
-  if (IS_WEB) {
-    return (
-      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-        <View style={{
-          width: size, height: size, borderRadius: size / 2,
-          background: `conic-gradient(${color} 0deg ${percentage * 3.6}deg, ${bgColor} ${percentage * 3.6}deg 360deg)`,
-          alignItems: 'center', justifyContent: 'center',
-        }}>
-          <View style={{
-            width: size - strokeWidth * 2, height: size - strokeWidth * 2,
-            borderRadius: (size - strokeWidth * 2) / 2, backgroundColor: '#FFFFFF',
-            alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Text style={{ fontFamily: F, fontSize: 24, fontWeight: '800', color }}>{Math.round(percentage)}%</Text>
-          </View>
-        </View>
-      </View>
-    );
-  }
-  // Native fallback: just show the number
+// --- Brand avatar with logo ---
+function BrandAvatar({ name, size = 32 }) {
+  const [imgError, setImgError] = useState(false);
+  const logoUrl = getBrandLogoUrl(name);
+  const initial = name.charAt(0).toUpperCase();
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: strokeWidth, borderColor: bgColor, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontFamily: F, fontSize: 24, fontWeight: '800', color }}>{Math.round(percentage)}%</Text>
+    <View style={{ alignItems: 'center', width: size + 16 }}>
+      {logoUrl && !imgError ? (
+        <Image
+          source={{ uri: logoUrl }}
+          style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#F0F0F0' }}
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <View style={[s.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
+          <Text style={[s.avatarLetter, { fontSize: size * 0.4 }]}>{initial}</Text>
+        </View>
+      )}
+      <Text style={s.avatarName} numberOfLines={1}>{name}</Text>
     </View>
   );
 }
 
-// ==================== INVISIBLE ====================
+function BrandAvatarWithCount({ name, count, size = 32 }) {
+  const [imgError, setImgError] = useState(false);
+  const logoUrl = getBrandLogoUrl(name);
+  const initial = name.charAt(0).toUpperCase();
+  return (
+    <View style={{ alignItems: 'center', width: size + 20 }}>
+      {logoUrl && !imgError ? (
+        <Image
+          source={{ uri: logoUrl }}
+          style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#F0F0F0' }}
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <View style={[s.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
+          <Text style={[s.avatarLetter, { fontSize: size * 0.4 }]}>{initial}</Text>
+        </View>
+      )}
+      <Text style={s.avatarName} numberOfLines={1}>{name}</Text>
+      <Text style={s.avatarCount}>{count}</Text>
+    </View>
+  );
+}
+
+// --- Horizontal framing bar ---
+function FramingBar({ cautionary = 0, recommended = 0 }) {
+  const neutral = 100 - cautionary - recommended;
+  return (
+    <View style={s.framingBar}>
+      {cautionary > 0 && <View style={[s.framingSegment, { flex: cautionary, backgroundColor: '#EF4444', borderTopLeftRadius: 4, borderBottomLeftRadius: 4 }]} />}
+      <View style={[s.framingSegment, { flex: Math.max(neutral, 1), backgroundColor: '#E5E7EB' }]} />
+      {recommended > 0 && <View style={[s.framingSegment, { flex: recommended, backgroundColor: '#10B981', borderTopRightRadius: 4, borderBottomRightRadius: 4 }]} />}
+    </View>
+  );
+}
+
+// ==================== INVISIBLE (CONTENT_GAP) ====================
 export function InvisibleCard({ insight }) {
   const competitors = parseCompetitors(insight.summary);
   return (
-    <View style={cs.container}>
-      {/* Big 0% */}
-      <View style={cs.centerBlock}>
-        <View style={cs.redGlow}>
-          <Text style={[cs.bigNumber, { color: '#EF4444' }]}>0%</Text>
-        </View>
-        <Text style={cs.metricLabel}>Mention Rate</Text>
-      </View>
-      {/* Competitors */}
+    <View style={s.container}>
+      <Text style={s.heroPrompt}>"{insight.promptGroup}"</Text>
+      <Text style={s.mutedLine}>You're not appearing in any responses</Text>
+
       {competitors.length > 0 && (
-        <View style={cs.section}>
-          <Text style={cs.sectionLabel}>Competitors present</Text>
-          <View style={cs.chipRow}>
+        <View style={s.section}>
+          <Text style={s.sectionLabel}>Who's showing up</Text>
+          <View style={s.avatarRow}>
             {competitors.map((c, i) => (
-              <View key={i} style={cs.chip}>
-                <Text style={cs.chipText}>{c.name}</Text>
-                <Text style={cs.chipCount}>{c.count}</Text>
-              </View>
+              <BrandAvatarWithCount key={i} name={c.name} count={c.count} size={30} />
             ))}
           </View>
         </View>
       )}
-      <Text style={cs.promptGroup}>{insight.promptGroup}</Text>
     </View>
   );
 }
 
-// ==================== AT RISK (Cautionary) ====================
+// ==================== AT RISK (Cautionary / FRAMING_RISK) ====================
 export function AtRiskCautionaryCard({ insight }) {
   const cautionRate = parseCautionaryRate(insight.summary) || parseFloat(insight.metric.after);
   const mentionRate = parseMentionRate(insight.summary);
-  const sourceRate = parseSourceRate(insight.summary);
   return (
-    <View style={cs.container}>
-      <View style={{ alignItems: 'center', marginBottom: 14 }}>
-        <DonutChart percentage={cautionRate} size={96} strokeWidth={10} color="#EF4444" />
-        <Text style={[cs.metricLabel, { marginTop: 6 }]}>Cautionary Rate</Text>
-      </View>
-      <View style={cs.statRow}>
-        <View style={cs.statBox}>
-          <Text style={cs.statValue}>{mentionRate != null ? `${mentionRate}%` : '—'}</Text>
-          <Text style={cs.statLabel}>Mentioned in</Text>
+    <View style={s.container}>
+      <FramingBar cautionary={cautionRate} />
+      <View style={s.statPair}>
+        <View style={s.statItem}>
+          <Text style={[s.statNumber, { color: '#EF4444' }]}>{Math.round(cautionRate)}%</Text>
+          <Text style={s.statLabel}>cautionary</Text>
         </View>
-        <View style={cs.statBox}>
-          <Text style={[cs.statValue, { color: colors.blue }]}>{sourceRate != null ? `${sourceRate}%` : '—'}</Text>
-          <Text style={cs.statLabel}>Own sources</Text>
+        <View style={s.statItem}>
+          <Text style={[s.statNumber, { color: colors.navy }]}>{mentionRate != null ? `${mentionRate}%` : '—'}</Text>
+          <Text style={s.statLabel}>mentioned</Text>
         </View>
       </View>
-      <Text style={cs.promptGroup}>{insight.promptGroup}</Text>
+      <Text style={s.mutedLine}>Negative framing in {Math.round(cautionRate)}% of responses</Text>
+      <Text style={s.promptGroup}>{insight.promptGroup}</Text>
     </View>
   );
 }
 
-// ==================== AT RISK (Competitive) ====================
+// ==================== AT RISK (Competitive / COMPETITIVE_FRAMING) ====================
 export function AtRiskCompetitiveCard({ insight }) {
   const competitors = parseCompetitors(insight.summary);
+  const rivalName = competitors.length > 0 ? competitors[0].name : 'Competitor';
   return (
-    <View style={cs.container}>
-      <View style={{ alignItems: 'center', marginBottom: 14 }}>
-        <DonutChart percentage={0} size={96} strokeWidth={10} color="#EF4444" />
-        <Text style={[cs.metricLabel, { marginTop: 6 }]}>Recommended Rate</Text>
-      </View>
-      {competitors.length > 0 && (
-        <View style={cs.section}>
-          <Text style={cs.sectionLabel}>Recommended instead</Text>
-          <View style={cs.chipRow}>
-            {competitors.map((c, i) => (
-              <View key={i} style={cs.chip}>
-                <Text style={cs.chipText}>{c.name}</Text>
-                <Text style={cs.chipCount}>{c.count}</Text>
-              </View>
-            ))}
+    <View style={s.container}>
+      <View style={s.versusRow}>
+        <View style={s.versusItem}>
+          <BrandAvatar name={rivalName} size={28} />
+          <View style={s.versusStatusRow}>
+            <Ionicons name="arrow-up" size={11} color="#10B981" />
+            <Text style={[s.versusStatus, { color: '#10B981' }]}>Recommended</Text>
           </View>
         </View>
-      )}
-      <Text style={cs.promptGroup}>{insight.promptGroup}</Text>
+        <View style={s.versusDivider} />
+        <View style={s.versusItem}>
+          <BrandAvatar name="Capital One" size={28} />
+          <View style={s.versusStatusRow}>
+            <Text style={[s.versusStatus, { color: lt.bodyLight }]}>— Not recommended</Text>
+          </View>
+        </View>
+      </View>
+      <Text style={s.mutedLine}>Competitor is recommended over you for this prompt</Text>
+      <Text style={s.promptGroup}>{insight.promptGroup}</Text>
     </View>
   );
 }
@@ -168,43 +194,58 @@ export function AtRiskCompetitiveCard({ insight }) {
 export function PPCHighCard({ insight }) {
   const rivals = parseRivals(insight.summary);
   return (
-    <View style={cs.container}>
-      <Text style={cs.ppcMetricLabel}>{insight.metric.label}</Text>
-      <View style={cs.ppcBeforeAfter}>
-        <Text style={cs.ppcBefore}>{insight.metric.before !== '-' ? insight.metric.before : '—'}</Text>
-        <Ionicons name="arrow-forward" size={18} color={lt.bodyLight} />
-        <Text style={[cs.ppcAfter, { color: '#EF4444' }]}>{insight.metric.after}</Text>
+    <View style={s.container}>
+      <Text style={s.ppcLabel}>{insight.metric.label}</Text>
+      <View style={s.ppcBeforeAfter}>
+        <Text style={s.ppcBefore}>{insight.metric.before !== '-' ? insight.metric.before : '—'}</Text>
+        <Text style={s.ppcArrow}>→</Text>
+        <Text style={[s.ppcAfter, { color: '#EF4444' }]}>{insight.metric.after}</Text>
       </View>
       {rivals.length > 0 && (
-        <View style={[cs.chipRow, { marginTop: 12 }]}>
+        <Text style={s.rivalLine}>
           {rivals.map((r, i) => {
             const isNeg = r.delta.includes('-') || r.delta.includes('–');
             return (
-              <View key={i} style={[cs.deltaChip, { backgroundColor: isNeg ? colors.dangerDim : colors.successDim }]}>
-                <Text style={[cs.deltaText, { color: isNeg ? '#EF4444' : colors.success }]}>{r.name} {r.delta}</Text>
-              </View>
+              <Text key={i}>
+                {i > 0 ? ' · ' : ''}
+                <Text style={s.rivalName}>{r.name} </Text>
+                <Text style={{ color: isNeg ? '#EF4444' : '#10B981', fontWeight: '600' }}>{r.delta}</Text>
+              </Text>
             );
           })}
-        </View>
+        </Text>
       )}
-      <Text style={cs.promptGroup}>{insight.promptGroup}</Text>
+      <Text style={s.promptGroup}>{insight.promptGroup}</Text>
     </View>
   );
 }
 
 // ==================== PPC MEDIUM ====================
 export function PPCMediumCard({ insight }) {
-  const firstClause = insight.summary.split('.')[0];
+  const rivals = parseRivals(insight.summary);
   return (
-    <View style={cs.container}>
-      <Text style={cs.ppcMetricLabel}>{insight.metric.label}</Text>
-      <View style={cs.ppcBeforeAfter}>
-        <Text style={cs.ppcBefore}>{insight.metric.before !== '-' ? insight.metric.before : '—'}</Text>
-        <Ionicons name="arrow-forward" size={18} color={lt.bodyLight} />
-        <Text style={[cs.ppcAfter, { color: '#F59E0B' }]}>{insight.metric.after}</Text>
+    <View style={s.container}>
+      <Text style={s.ppcLabel}>{insight.metric.label}</Text>
+      <View style={s.ppcBeforeAfter}>
+        <Text style={s.ppcBefore}>{insight.metric.before !== '-' ? insight.metric.before : '—'}</Text>
+        <Text style={s.ppcArrow}>→</Text>
+        <Text style={[s.ppcAfter, { color: '#F59E0B' }]}>{insight.metric.after}</Text>
       </View>
-      <Text style={[cs.keyChange, { marginTop: 10 }]}>{firstClause}.</Text>
-      <Text style={cs.promptGroup}>{insight.promptGroup}</Text>
+      {rivals.length > 0 && (
+        <Text style={s.rivalLine}>
+          {rivals.map((r, i) => {
+            const isNeg = r.delta.includes('-') || r.delta.includes('–');
+            return (
+              <Text key={i}>
+                {i > 0 ? ' · ' : ''}
+                <Text style={s.rivalName}>{r.name} </Text>
+                <Text style={{ color: isNeg ? '#EF4444' : '#10B981', fontWeight: '600' }}>{r.delta}</Text>
+              </Text>
+            );
+          })}
+        </Text>
+      )}
+      <Text style={s.promptGroup}>{insight.promptGroup}</Text>
     </View>
   );
 }
@@ -212,9 +253,9 @@ export function PPCMediumCard({ insight }) {
 // ==================== FALLBACK ====================
 export function FallbackCard({ insight }) {
   return (
-    <View style={cs.container}>
-      <Text style={cs.fallbackSummary}>{insight.summary}</Text>
-      <Text style={cs.promptGroup}>{insight.promptGroup}</Text>
+    <View style={s.container}>
+      <Text style={s.fallbackText}>{insight.summary}</Text>
+      <Text style={s.promptGroup}>{insight.promptGroup}</Text>
     </View>
   );
 }
@@ -239,52 +280,55 @@ export default function InsightCardVisual({ insight }) {
 }
 
 // ==================== STYLES ====================
-const cs = StyleSheet.create({
-  container: { alignItems: 'center' },
+const s = StyleSheet.create({
+  container: { alignItems: 'center', paddingVertical: 4 },
 
-  // Invisible
-  centerBlock: { alignItems: 'center', marginBottom: 14 },
-  redGlow: {
-    width: 96, height: 96, borderRadius: 48,
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  bigNumber: { fontFamily: F, fontSize: 42, fontWeight: '800' },
-  metricLabel: { fontFamily: F, fontSize: 13, color: lt.bodyLight, fontWeight: '500' },
+  // Hero prompt (Invisible card)
+  heroPrompt: { fontFamily: F, fontSize: 18, fontWeight: '600', color: colors.navy, textAlign: 'center', marginBottom: 6 },
+
+  // Muted description line
+  mutedLine: { fontFamily: F, fontSize: 12, color: lt.bodyLight, textAlign: 'center', lineHeight: 18, marginBottom: 8 },
 
   // Sections
-  section: { width: '100%', marginBottom: 10 },
-  sectionLabel: { fontFamily: F, fontSize: 11, fontWeight: '700', color: lt.bodyLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: colors.navy, paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: radius.full,
-  },
-  chipText: { fontFamily: F, fontSize: 11, fontWeight: '600', color: '#FFFFFF' },
-  chipCount: { fontFamily: F, fontSize: 11, fontWeight: '700', color: colors.lime },
+  section: { width: '100%', marginTop: 6 },
+  sectionLabel: { fontFamily: F, fontSize: 9, fontWeight: '700', color: lt.bodyLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
 
-  // Stat row
-  statRow: { flexDirection: 'row', gap: 10, width: '100%', marginBottom: 10 },
-  statBox: {
-    flex: 1, backgroundColor: lt.metricBg, borderRadius: radius.md,
-    padding: 10, alignItems: 'center',
-  },
-  statValue: { fontFamily: F, fontSize: 20, fontWeight: '800', color: lt.headline },
-  statLabel: { fontFamily: F, fontSize: 11, color: lt.bodyLight, marginTop: 2 },
+  // Brand avatars
+  avatarRow: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
+  avatar: { backgroundColor: colors.navy, alignItems: 'center', justifyContent: 'center' },
+  avatarLetter: { fontFamily: F, fontWeight: '700', color: '#FFFFFF' },
+  avatarName: { fontFamily: F, fontSize: 10, color: lt.bodyLight, marginTop: 3, textAlign: 'center' },
+  avatarCount: { fontFamily: F, fontSize: 11, fontWeight: '600', color: lt.headline, marginTop: 1 },
+
+  // Framing bar
+  framingBar: { flexDirection: 'row', width: '100%', height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 10 },
+  framingSegment: { height: 6 },
+
+  // Stat pair
+  statPair: { flexDirection: 'row', justifyContent: 'center', gap: 32, marginBottom: 8 },
+  statItem: { alignItems: 'center' },
+  statNumber: { fontFamily: F, fontSize: 20, fontWeight: '700' },
+  statLabel: { fontFamily: F, fontSize: 10, color: lt.bodyLight, marginTop: 1 },
+
+  // Versus layout
+  versusRow: { flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 8 },
+  versusItem: { flex: 1, alignItems: 'center' },
+  versusDivider: { width: 1, height: 40, backgroundColor: '#E5E7EB' },
+  versusStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
+  versusStatus: { fontFamily: F, fontSize: 10, fontWeight: '600' },
 
   // PPC
-  ppcMetricLabel: { fontFamily: F, fontSize: 13, fontWeight: '600', color: lt.bodyLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  ppcBeforeAfter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  ppcBefore: { fontFamily: F, fontSize: 20, fontWeight: '500', color: lt.bodyLight },
-  ppcAfter: { fontFamily: F, fontSize: 28, fontWeight: '800' },
-  deltaChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.full },
-  deltaText: { fontFamily: F, fontSize: 11, fontWeight: '600' },
-  keyChange: { fontFamily: F, fontSize: 13, color: lt.body, textAlign: 'center', lineHeight: 19 },
+  ppcLabel: { fontFamily: F, fontSize: 11, fontWeight: '600', color: lt.bodyLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  ppcBeforeAfter: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 8 },
+  ppcBefore: { fontFamily: F, fontSize: 16, fontWeight: '500', color: lt.bodyLight },
+  ppcArrow: { fontFamily: F, fontSize: 14, color: lt.bodyLight },
+  ppcAfter: { fontFamily: F, fontSize: 24, fontWeight: '800' },
+  rivalLine: { fontFamily: F, fontSize: 11, color: lt.bodyLight, textAlign: 'center', lineHeight: 16, marginBottom: 6 },
+  rivalName: { color: lt.body },
 
   // Fallback
-  fallbackSummary: { fontFamily: F, fontSize: 13, color: lt.body, lineHeight: 19, textAlign: 'center' },
+  fallbackText: { fontFamily: F, fontSize: 12, color: lt.body, lineHeight: 18, textAlign: 'center' },
 
   // Common
-  promptGroup: { fontFamily: F, fontSize: 12, fontStyle: 'italic', color: lt.bodyLight, marginTop: 10 },
+  promptGroup: { fontFamily: F, fontSize: 11, fontStyle: 'italic', color: lt.bodyLight, marginTop: 4 },
 });

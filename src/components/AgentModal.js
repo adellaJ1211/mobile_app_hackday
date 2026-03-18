@@ -146,18 +146,24 @@ export default function AgentModal({ visible, insight, onClose, onApprove }) {
 
           {completed && (
             <View style={styles.resultSection}>
+              {insight?.deliverable && (
+                <View style={styles.deliverablePreview}>
+                  <Text style={styles.deliverableTitle}>{insight.deliverable.title}</Text>
+                  <Text style={styles.deliverableBody} numberOfLines={3}>
+                    {insight.deliverable.body}
+                  </Text>
+                </View>
+              )}
               <View style={styles.resultBox}>
                 <Text style={styles.resultText}>{resultText}</Text>
               </View>
-              <View style={styles.approvalRow}>
-                <TouchableOpacity style={styles.rejectBtn} onPress={onClose}>
-                  <Text style={styles.rejectText}>Dismiss</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.approveBtn} onPress={() => onApprove?.(insight)}>
-                  <Ionicons name="checkmark-circle" size={16} color={colors.navy} />
-                  <Text style={styles.approveText}>Approve</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity style={styles.approveBtn} onPress={() => onApprove?.(insight)}>
+                <Ionicons name="document-text" size={16} color={colors.navy} />
+                <Text style={styles.approveText}>View in Review</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.dismissBtn} onPress={onClose}>
+                <Text style={styles.dismissText}>Done</Text>
+              </TouchableOpacity>
             </View>
           )}
         </ScrollView>
@@ -188,11 +194,13 @@ const styles = StyleSheet.create({
   stepLabelDone: { color: colors.textSecondary },
   stepLabelActive: { color: colors.textPrimary, fontWeight: '600' },
   resultSection: { marginTop: spacing.sm },
-  resultBox: { backgroundColor: colors.bgCard, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg },
+  deliverablePreview: { backgroundColor: colors.bgCardElevated, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm },
+  deliverableTitle: { fontFamily: FONT_FAMILY, fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
+  deliverableBody: { fontFamily: FONT_FAMILY, fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
+  resultBox: { backgroundColor: colors.bgCard, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md },
   resultText: { fontFamily: FONT_FAMILY, fontSize: 13, color: colors.textPrimary, lineHeight: 20 },
-  approvalRow: { flexDirection: 'row', gap: spacing.sm },
-  rejectBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.md, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border },
-  rejectText: { fontFamily: FONT_FAMILY, color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
-  approveBtn: { flex: 1.3, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: spacing.md, borderRadius: radius.full, backgroundColor: colors.lime },
+  approveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: spacing.md, borderRadius: radius.full, backgroundColor: colors.lime, marginBottom: spacing.sm },
   approveText: { fontFamily: FONT_FAMILY, color: colors.navy, fontSize: 14, fontWeight: '700' },
+  dismissBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.md, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border },
+  dismissText: { fontFamily: FONT_FAMILY, color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
 });

@@ -71,6 +71,7 @@ export function WorkflowsProvider({ children }) {
       agentAction: insight.agentAction,
       promptGroup: insight.promptGroup,
       insightType: insight.type,
+      deliverable: insight.deliverable || null,
       status: 'running',
       currentStep: 0,
       steps: labels.map((label, i) => ({
@@ -156,6 +157,8 @@ export function WorkflowsProvider({ children }) {
   const activeCount = workflows.filter((w) => w.status === 'running').length;
   const completeCount = workflows.filter((w) => w.status === 'complete' || w.status === 'approved').length;
   const workflowCount = workflows.filter((w) => w.status !== 'approved').length;
+  const completedWorkflows = workflows.filter((w) => (w.status === 'complete' || w.status === 'approved') && w.deliverable);
+  const reviewCount = workflows.filter((w) => w.status === 'complete' && w.deliverable).length;
 
   return (
     <WorkflowsContext.Provider
@@ -169,6 +172,8 @@ export function WorkflowsProvider({ children }) {
         activeCount,
         completeCount,
         workflowCount,
+        completedWorkflows,
+        reviewCount,
       }}
     >
       {children}

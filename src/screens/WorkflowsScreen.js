@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Platform,
 } from 'react-native';
@@ -29,13 +29,18 @@ function PulsingDot({ color, size = 8 }) {
 }
 
 function WorkflowCard({ workflow, onApprove }) {
+  const [expanded, setExpanded] = useState(false);
   const isRunning = workflow.status === 'running';
   const isComplete = workflow.status === 'complete';
   const isApproved = workflow.status === 'approved';
   const isAISearch = workflow.insightType === 'ai-search';
 
   return (
-    <View style={[styles.card, isApproved && styles.cardApproved]}>
+    <TouchableOpacity
+      style={[styles.card, isApproved && styles.cardApproved]}
+      activeOpacity={0.8}
+      onPress={() => setExpanded((p) => !p)}
+    >
       {/* Top badges */}
       <View style={styles.badgeRow}>
         <View style={[styles.typeBadge, { backgroundColor: isAISearch ? colors.aiSearchDim : colors.ppcDim }]}>
@@ -51,78 +56,112 @@ function WorkflowCard({ workflow, onApprove }) {
           <Text style={[styles.statusText, {
             color: isRunning ? colors.lime : isComplete ? colors.success : colors.textMuted,
           }]}>
-            {isRunning ? 'Running' : isComplete ? 'Ready for review' : 'Approved'}
+            {isRunning ? 'Running' : isComplete ? 'Complete' : 'Reviewed'}
           </Text>
         </View>
       </View>
 
       {/* Title + meta */}
       <Text style={styles.workflowTitle}>{workflow.agentAction.label}</Text>
-      <Text style={styles.workflowSource} numberOfLines={1}>{workflow.insightTitle}</Text>
       <Text style={styles.workflowPrompt}>{workflow.promptGroup}</Text>
 
-      {/* Step progress */}
-      <View style={styles.stepper}>
-        {workflow.steps.map((step, idx) => {
-          const isDone = step.status === 'done';
-          const isActive = step.status === 'active';
-          const isLast = idx === workflow.steps.length - 1;
-
-          return (
-            <View key={idx}>
-              <View style={styles.stepRow}>
-                {/* Dot */}
-                <View style={styles.stepDotCol}>
-                  {isDone ? (
-                    <View style={[styles.stepDot, styles.stepDotDone]}>
-                      <Ionicons name="checkmark" size={9} color="#fff" />
-                    </View>
-                  ) : isActive ? (
-                    <View style={[styles.stepDot, styles.stepDotActive]}>
-                      <PulsingDot color={colors.blue} size={6} />
-                    </View>
-                  ) : (
-                    <View style={[styles.stepDot, styles.stepDotPending]} />
-                  )}
-                </View>
-                {/* Label */}
-                <Text style={[
-                  styles.stepLabel,
-                  isDone && styles.stepLabelDone,
-                  isActive && styles.stepLabelActive,
-                ]} numberOfLines={1}>
-                  {step.label}{isActive ? '...' : ''}
-                </Text>
-              </View>
-              {/* Connector line */}
-              {!isLast && (
-                <View style={styles.stepConnectorWrap}>
-                  <View style={[styles.stepConnector, {
-                    backgroundColor: isDone ? colors.blue : 'rgba(255,255,255,0.1)',
-                  }]} />
-                </View>
-              )}
-            </View>
-          );
-        })}
-      </View>
-
-      {/* Result + approve */}
-      {isComplete && workflow.result && (
-        <View style={styles.resultSection}>
-          <View style={styles.resultBox}>
-            <Text style={styles.resultText}>{workflow.result}</Text>
+      {/* Collapsed: summary row */}
+      {!expanded && (
+        <View style={styles.collapsedRow}>
+          <View style={styles.stepProgress}>
+            {workflow.steps.map((step, idx) => {
+              const isDone = step.status === 'done';
+              const isActive = step.status === 'active';
+              return (
+                <View key={idx} style={[
+                  styles.progressDot,
+                  isDone && styles.progressDotDone,
+                  isActive && styles.progressDotActive,
+                ]} />
+              );
+            })}
           </View>
-          <TouchableOpacity style={styles.approveBtn} onPress={() => onApprove(workflow.id)} activeOpacity={0.85}>
-            <Ionicons name="checkmark-circle" size={16} color={colors.navy} />
-            <Text style={styles.approveBtnText}>Approve</Text>
-          </TouchableOpacity>
+          <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
         </View>
       )}
 
-      {/* Time */}
-      <Text style={styles.timeText}>Started {workflow.startedAt}</Text>
-    </View>
+      {/* Expanded: node-builder step detail */}
+      {expanded && (
+        <View style={styles.nodeBuilder}>
+          {workflow.steps.map((step, idx) => {
+            const isDone = step.status === 'done';
+            const isActive = step.status === 'active';
+            const isLast = idx === workflow.steps.length - 1;
+
+            return (
+              <View key={idx}>
+                <View style={styles.nodeRow}>
+                  {/* Node circle */}
+                  <View style={styles.nodeCol}>
+                    {isDone ? (
+                      <View style={[styles.node, styles.nodeDone]}>
+                        <Ionicons name="checkmark" size={11} color="#fff" />
+                      </View>
+                    ) : isActive ? (
+                      <View style={[styles.node, styles.nodeActive]}>
+                        <PulsingDot color={colors.blue} size={6} />
+                      </View>
+                    ) : (
+                      <View style={[styles.node, styles.nodePending]}>
+                        <Text style={styles.nodeNumber}>{idx + 1}</Text>
+                      </View>
+                    )}
+                  </View>
+                  {/* Label + time */}
+                  <View style={styles.nodeContent}>
+                    <Text style={[
+                      styles.nodeLabel,
+                      isDone && styles.nodeLabelDone,
+                      isActive && styles.nodeLabelActive,
+                    ]}>
+                      {step.label}{isActive ? '...' : ''}
+                    </Text>
+                    {isDone && step.completedAt && (
+                      <Text style={styles.nodeTime}>{step.completedAt}</Text>
+                    )}
+                  </View>
+                </View>
+                {/* Connector */}
+                {!isLast && (
+                  <View style={styles.connectorWrap}>
+                    <View style={[styles.connector, {
+                      backgroundColor: isDone ? colors.lime : 'rgba(255,255,255,0.08)',
+                    }]} />
+                  </View>
+                )}
+              </View>
+            );
+          })}
+
+          {/* Deliverable preview when complete */}
+          {(isComplete || isApproved) && workflow.deliverable && (
+            <View style={styles.deliverableSection}>
+              <View style={styles.deliverableBox}>
+                <Ionicons name="document-text" size={14} color={colors.lime} />
+                <Text style={styles.deliverableTitle}>{workflow.deliverable.title}</Text>
+              </View>
+              <Text style={styles.deliverableHint}>Available in Review tab</Text>
+            </View>
+          )}
+
+          {/* Time */}
+          <Text style={styles.timeText}>
+            Started {workflow.startedAt}
+            {workflow.completedAt ? ` · Completed ${workflow.completedAt}` : ''}
+          </Text>
+
+          {/* Collapse */}
+          <TouchableOpacity style={styles.collapseBtn} onPress={() => setExpanded(false)}>
+            <Ionicons name="chevron-up" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+      )}
+    </TouchableOpacity>
   );
 }
 
@@ -199,52 +238,52 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY, fontSize: 16, fontWeight: '600',
     color: colors.textPrimary, marginBottom: 2,
   },
-  workflowSource: {
-    fontFamily: FONT_FAMILY, fontSize: 13, color: colors.textSecondary, marginBottom: 2,
-  },
   workflowPrompt: {
     fontFamily: FONT_FAMILY, fontSize: 12, fontStyle: 'italic',
-    color: colors.textMuted, marginBottom: 12,
+    color: colors.textMuted, marginBottom: 8,
   },
 
-  // Stepper
-  stepper: { marginBottom: 8 },
-  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  stepDotCol: { width: 20, alignItems: 'center' },
-  stepDot: {
-    width: 20, height: 20, borderRadius: 10,
+  // Collapsed row
+  collapsedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  stepProgress: { flexDirection: 'row', gap: 4 },
+  progressDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.1)' },
+  progressDotDone: { backgroundColor: colors.lime },
+  progressDotActive: { backgroundColor: colors.blue },
+
+  // Node builder
+  nodeBuilder: { marginTop: 8 },
+  nodeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  nodeCol: { width: 28, alignItems: 'center' },
+  node: {
+    width: 28, height: 28, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: colors.border,
     backgroundColor: colors.bgCard,
   },
-  stepDotDone: { backgroundColor: colors.lime, borderColor: colors.lime },
-  stepDotActive: { borderColor: colors.blue, backgroundColor: colors.limeDim },
-  stepDotPending: {},
-  stepLabel: { fontFamily: FONT_FAMILY, fontSize: 13, color: colors.textMuted, flex: 1 },
-  stepLabelDone: { color: colors.textSecondary },
-  stepLabelActive: { color: colors.textPrimary, fontWeight: '600' },
-  stepConnectorWrap: { paddingLeft: 9, height: 16, justifyContent: 'center' },
-  stepConnector: { width: 2, height: 12, borderRadius: 1 },
+  nodeDone: { backgroundColor: colors.lime, borderColor: colors.lime },
+  nodeActive: { borderColor: colors.blue, backgroundColor: colors.limeDim },
+  nodePending: { borderColor: 'rgba(255,255,255,0.15)' },
+  nodeNumber: { fontFamily: FONT_FAMILY, fontSize: 11, fontWeight: '600', color: colors.textMuted },
+  nodeContent: { flex: 1 },
+  nodeLabel: { fontFamily: FONT_FAMILY, fontSize: 13, color: colors.textMuted },
+  nodeLabelDone: { color: colors.textSecondary },
+  nodeLabelActive: { color: colors.textPrimary, fontWeight: '600' },
+  nodeTime: { fontFamily: FONT_FAMILY, fontSize: 10, color: colors.textMuted, marginTop: 1 },
+  connectorWrap: { paddingLeft: 13, height: 20, justifyContent: 'center' },
+  connector: { width: 2, height: 16, borderRadius: 1 },
 
-  // Result
-  resultSection: { marginTop: 4, marginBottom: 4 },
-  resultBox: {
-    backgroundColor: colors.bgCardElevated, padding: spacing.md,
-    borderRadius: radius.md, marginBottom: spacing.sm,
+  // Deliverable
+  deliverableSection: { marginTop: 12, marginBottom: 4 },
+  deliverableBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.bgCardElevated, padding: spacing.sm + 2,
+    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
   },
-  resultText: {
-    fontFamily: FONT_FAMILY, fontSize: 13, color: colors.textPrimary, lineHeight: 19,
-  },
-  approveBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 12, borderRadius: radius.full,
-    backgroundColor: colors.lime,
-  },
-  approveBtnText: {
-    fontFamily: FONT_FAMILY, fontSize: 14, fontWeight: '700', color: colors.navy,
-  },
+  deliverableTitle: { fontFamily: FONT_FAMILY, fontSize: 13, fontWeight: '600', color: colors.textPrimary, flex: 1 },
+  deliverableHint: { fontFamily: FONT_FAMILY, fontSize: 11, color: colors.textMuted, marginTop: 4, marginLeft: 2 },
 
   timeText: {
-    fontFamily: FONT_FAMILY, fontSize: 11, color: colors.textMuted, marginTop: 6,
+    fontFamily: FONT_FAMILY, fontSize: 11, color: colors.textMuted, marginTop: 10,
   },
+  collapseBtn: { alignItems: 'center', paddingTop: 8 },
 });
