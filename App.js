@@ -40,8 +40,8 @@ function TabNavigator() {
           backgroundColor: colors.navy,
           borderTopColor: 'rgba(255,255,255,0.1)',
           borderTopWidth: 1,
-          paddingBottom: 40,
-          height: 95,
+          paddingBottom: IS_WEB ? 8 : 28,
+          height: IS_WEB ? 70 : 80,
           paddingTop: 8,
         },
         tabBarActiveTintColor: colors.lime,
@@ -53,7 +53,7 @@ function TabNavigator() {
         },
         tabBarIcon: ({ focused, color }) => {
           const icons = tabIcons[route.name];
-          return <Ionicons name={focused ? icons.active : icons.inactive} size={22} color={color} />;
+          return <Ionicons name={focused ? icons.active : icons.inactive} size={18} color={color} />;
         },
       })}
     >
