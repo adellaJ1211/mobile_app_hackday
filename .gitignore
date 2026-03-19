@@ -6,3 +6,6 @@ dist/
 *.png.bak
 Screenshot*.png
 actionable_insights*.csv
+
+# Ignore environment variables
+.env

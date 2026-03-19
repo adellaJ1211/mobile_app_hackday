@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, Platform, Image, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '../theme/colors';
 
@@ -7,220 +7,182 @@ const IS_WEB = Platform.OS === 'web';
 const F = IS_WEB ? '"Montserrat", system-ui, sans-serif' : undefined;
 const lt = colors.light;
 
+// ==================== FAVICON / BRAND LOGO HELPERS ====================
+
+function getFaviconUrl(domain) {
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+}
+
 const brandDomains = {
   'Barclaycard': 'barclaycard.co.uk',
   'TSB': 'tsb.co.uk',
   'HSBC': 'hsbc.co.uk',
-  'NerdWallet': 'nerdwallet.com',
+  'NatWest': 'natwest.com',
+  'Santander': 'santander.co.uk',
+  'Virgin Money': 'virginmoney.com',
+  'Tesco Bank': 'tescobank.com',
+  'MBNA': 'mbna.co.uk',
+  'Capital One': 'capitalone.co.uk',
+  'Aqua': 'aquacard.co.uk',
+  'American Express': 'americanexpress.com',
+  'Lloyds': 'lloydsbank.com',
+  'Halifax': 'halifax.co.uk',
+  'Vanquis': 'vanquis.co.uk',
   'Experian': 'experian.co.uk',
   'Equifax': 'equifax.co.uk',
-  'Capital One': 'capitalone.co.uk',
-  'Post Office': 'postoffice.co.uk',
-  'MoneySupermarket': 'moneysupermarket.com',
+  'TransUnion': 'transunion.co.uk',
+  'MoneySavingExpert': 'moneysavingexpert.com',
+  'Compare the Market': 'comparethemarket.com',
+  'Marbles': 'marbles.com',
+  'Barclays': 'barclays.co.uk',
 };
 
 function getBrandLogoUrl(name) {
   const domain = brandDomains[name];
   if (!domain) return null;
-  return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
 }
 
-// --- Parsers ---
-function parseCompetitors(summary) {
-  const match = summary.match(/Competitors mentioned:\s*(.+?)\./) || summary.match(/Competitors with[^:]*:\s*(.+?)\./);
-  if (!match) return [];
-  return match[1].split(/,\s*/).map((s) => {
-    const m = s.match(/(.+?)\s*\((\d+)x?\)/);
-    return m ? { name: m[1].trim(), count: parseInt(m[2], 10) } : null;
-  }).filter(Boolean).sort((a, b) => b.count - a.count);
+// ==================== SOURCE LIST (vertical rows with favicon) ====================
+
+function SourceList({ sources }) {
+  if (!sources || sources.length === 0) return null;
+  return (
+    <View style={s.section}>
+      <Text style={s.sectionLabel}>Top cited sources</Text>
+      {sources.slice(0, 3).map((source, i) => (
+        <View key={i} style={s.sourceRow}>
+          <Image
+            source={{ uri: getFaviconUrl(source.domain) }}
+            style={s.sourceFavicon}
+            defaultSource={{ uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==' }}
+          />
+          <Text style={s.sourceDomain} numberOfLines={1}>{source.domain}</Text>
+          <Text style={s.sourceCount}>{source.count}</Text>
+        </View>
+      ))}
+    </View>
+  );
 }
 
-function parseMentionRate(summary) {
-  const m = summary.match(/mentioned in ([\d.]+)% of citations/);
-  return m ? parseFloat(m[1]) : null;
+// ==================== BRAND MENTION ROW (horizontal, expandable) ====================
+
+function BrandMentionRow({ brands }) {
+  if (!brands || brands.length === 0) return null;
+
+  return (
+    <View style={s.section}>
+      <Text style={s.sectionLabel}>Brands mentioned</Text>
+      <View style={s.brandGrid}>
+        {brands.map((brand, i) => (
+          <BrandChip key={i} name={brand.name} count={brand.count} />
+        ))}
+      </View>
+    </View>
+  );
 }
 
-function parseSourceRate(summary) {
-  const m = summary.match(/(?:Own source rate|own domain cited in only)[:\s]*([\d.]+)%/i);
-  return m ? parseFloat(m[1]) : null;
+function BrandChip({ name, count }) {
+  const [imgError, setImgError] = useState(false);
+  const logoUrl = getBrandLogoUrl(name);
+  const initial = name.charAt(0).toUpperCase();
+
+  return (
+    <View style={s.brandChip}>
+      {logoUrl && !imgError ? (
+        <Image
+          source={{ uri: logoUrl }}
+          style={s.brandChipLogo}
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <View style={s.brandChipInitial}>
+          <Text style={s.brandChipInitialText}>{initial}</Text>
+        </View>
+      )}
+      <Text style={s.brandChipName} numberOfLines={1}>{name}</Text>
+      <Text style={s.brandChipCount}>{count}</Text>
+    </View>
+  );
 }
 
-function parseCautionaryRate(summary) {
-  const m = summary.match(/(\d+)%\s*carry\s*cautionary/);
-  return m ? parseInt(m[1], 10) : null;
+// ==================== UNIFIED AI SEARCH CARD ====================
+
+function AISearchCard({ insight }) {
+  const sources = insight.competitorUrls || [];
+  const brands = insight.brandMentions || [];
+
+  return (
+    <View style={s.container}>
+      <Text style={s.summaryText}>{insight.summary}</Text>
+      <SourceList sources={sources} />
+      <BrandMentionRow brands={brands} />
+    </View>
+  );
 }
+
+// ==================== PPC CARDS (unchanged) ====================
 
 function parseRivals(summary) {
   const match = summary.match(/Rivals?:\s*(.+?)(?:\.\s*Profit|$)/);
   if (!match) return [];
-  return match[1].split(/[;,]\s*/).map((s) => {
-    const m = s.trim().match(/(.+?)\s*([+\-–]\s*[\d.]+pp)/);
+  return match[1].split(/[;,]\s*/).map((str) => {
+    const m = str.trim().match(/(.+?)\s*([+\-–]\s*[\d.]+pp)/);
     return m ? { name: m[1].trim(), delta: m[2].replace(/\s/g, '') } : null;
   }).filter(Boolean);
 }
 
-// --- Brand avatar with logo ---
-function BrandAvatar({ name, size = 32 }) {
-  const [imgError, setImgError] = useState(false);
-  const logoUrl = getBrandLogoUrl(name);
-  const initial = name.charAt(0).toUpperCase();
-  return (
-    <View style={{ alignItems: 'center', width: size + 16 }}>
-      {logoUrl && !imgError ? (
-        <Image
-          source={{ uri: logoUrl }}
-          style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#F0F0F0' }}
-          onError={() => setImgError(true)}
-        />
-      ) : (
-        <View style={[s.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
-          <Text style={[s.avatarLetter, { fontSize: size * 0.4 }]}>{initial}</Text>
-        </View>
-      )}
-      <Text style={s.avatarName} numberOfLines={1}>{name}</Text>
-    </View>
-  );
-}
-
-function BrandAvatarWithCount({ name, count, size = 32 }) {
-  const [imgError, setImgError] = useState(false);
-  const logoUrl = getBrandLogoUrl(name);
-  const initial = name.charAt(0).toUpperCase();
-  return (
-    <View style={{ alignItems: 'center', width: size + 20 }}>
-      {logoUrl && !imgError ? (
-        <Image
-          source={{ uri: logoUrl }}
-          style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#F0F0F0' }}
-          onError={() => setImgError(true)}
-        />
-      ) : (
-        <View style={[s.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
-          <Text style={[s.avatarLetter, { fontSize: size * 0.4 }]}>{initial}</Text>
-        </View>
-      )}
-      <Text style={s.avatarName} numberOfLines={1}>{name}</Text>
-      <Text style={s.avatarCount}>{count}</Text>
-    </View>
-  );
-}
-
-// --- Horizontal framing bar ---
-function FramingBar({ cautionary = 0, recommended = 0 }) {
-  const neutral = 100 - cautionary - recommended;
-  return (
-    <View style={s.framingBar}>
-      {cautionary > 0 && <View style={[s.framingSegment, { flex: cautionary, backgroundColor: '#EF4444', borderTopLeftRadius: 4, borderBottomLeftRadius: 4 }]} />}
-      <View style={[s.framingSegment, { flex: Math.max(neutral, 1), backgroundColor: '#E5E7EB' }]} />
-      {recommended > 0 && <View style={[s.framingSegment, { flex: recommended, backgroundColor: '#10B981', borderTopRightRadius: 4, borderBottomRightRadius: 4 }]} />}
-    </View>
-  );
-}
-
-// ==================== INVISIBLE (CONTENT_GAP) ====================
-export function InvisibleCard({ insight }) {
-  const competitors = parseCompetitors(insight.summary);
-  return (
-    <View style={s.container}>
-      <Text style={s.heroPrompt}>"{insight.promptGroup}"</Text>
-      <Text style={s.mutedLine}>You're not appearing in any responses</Text>
-
-      {competitors.length > 0 && (
-        <View style={s.section}>
-          <Text style={s.sectionLabel}>Who's showing up</Text>
-          <View style={s.avatarRow}>
-            {competitors.map((c, i) => (
-              <BrandAvatarWithCount key={i} name={c.name} count={c.count} size={30} />
-            ))}
-          </View>
-        </View>
-      )}
-    </View>
-  );
-}
-
-// ==================== AT RISK (Cautionary / FRAMING_RISK) ====================
-export function AtRiskCautionaryCard({ insight }) {
-  const cautionRate = parseCautionaryRate(insight.summary) || parseFloat(insight.metric.after);
-  const mentionRate = parseMentionRate(insight.summary);
-  return (
-    <View style={s.container}>
-      <FramingBar cautionary={cautionRate} />
-      <View style={s.statPair}>
-        <View style={s.statItem}>
-          <Text style={[s.statNumber, { color: '#EF4444' }]}>{Math.round(cautionRate)}%</Text>
-          <Text style={s.statLabel}>cautionary</Text>
-        </View>
-        <View style={s.statItem}>
-          <Text style={[s.statNumber, { color: colors.navy }]}>{mentionRate != null ? `${mentionRate}%` : '—'}</Text>
-          <Text style={s.statLabel}>mentioned</Text>
-        </View>
-      </View>
-      <Text style={s.mutedLine}>Negative framing in {Math.round(cautionRate)}% of responses</Text>
-      <Text style={s.promptGroup}>{insight.promptGroup}</Text>
-    </View>
-  );
-}
-
-// ==================== AT RISK (Competitive / COMPETITIVE_FRAMING) ====================
-export function AtRiskCompetitiveCard({ insight }) {
-  const competitors = parseCompetitors(insight.summary);
-  const rivalName = competitors.length > 0 ? competitors[0].name : 'Competitor';
-  return (
-    <View style={s.container}>
-      <View style={s.versusRow}>
-        <View style={s.versusItem}>
-          <BrandAvatar name={rivalName} size={28} />
-          <View style={s.versusStatusRow}>
-            <Ionicons name="arrow-up" size={11} color="#10B981" />
-            <Text style={[s.versusStatus, { color: '#10B981' }]}>Recommended</Text>
-          </View>
-        </View>
-        <View style={s.versusDivider} />
-        <View style={s.versusItem}>
-          <BrandAvatar name="Capital One" size={28} />
-          <View style={s.versusStatusRow}>
-            <Text style={[s.versusStatus, { color: lt.bodyLight }]}>— Not recommended</Text>
-          </View>
-        </View>
-      </View>
-      <Text style={s.mutedLine}>Competitor is recommended over you for this prompt</Text>
-      <Text style={s.promptGroup}>{insight.promptGroup}</Text>
-    </View>
-  );
-}
-
-// ==================== PPC HIGH ====================
 export function PPCHighCard({ insight }) {
-  const rivals = parseRivals(insight.summary);
+  const m = insight.ppcMetrics || {};
+  const gainers = insight.competitorGainers || [];
+  const profitChange = m.profitP2 != null && m.profitP1 != null ? Math.round(m.profitP2 - m.profitP1) : null;
+
   return (
     <View style={s.container}>
+      {/* CPA metric */}
       <Text style={s.ppcLabel}>{insight.metric.label}</Text>
       <View style={s.ppcBeforeAfter}>
         <Text style={s.ppcBefore}>{insight.metric.before !== '-' ? insight.metric.before : '—'}</Text>
         <Text style={s.ppcArrow}>→</Text>
         <Text style={[s.ppcAfter, { color: '#EF4444' }]}>{insight.metric.after}</Text>
       </View>
-      {rivals.length > 0 && (
-        <Text style={s.rivalLine}>
-          {rivals.map((r, i) => {
-            const isNeg = r.delta.includes('-') || r.delta.includes('–');
-            return (
-              <Text key={i}>
-                {i > 0 ? ' · ' : ''}
-                <Text style={s.rivalName}>{r.name} </Text>
-                <Text style={{ color: isNeg ? '#EF4444' : '#10B981', fontWeight: '600' }}>{r.delta}</Text>
-              </Text>
-            );
-          })}
-        </Text>
+
+      {/* Profit change */}
+      {profitChange != null && (
+        <View style={{ marginBottom: 10 }}>
+          <Text style={s.ppcLabel}>Profit</Text>
+          <View style={s.ppcBeforeAfter}>
+            <Text style={s.ppcBefore}>£{Math.round(m.profitP1).toLocaleString()}</Text>
+            <Text style={s.ppcArrow}>→</Text>
+            <Text style={[s.ppcProfitAfter, { color: profitChange < 0 ? '#EF4444' : '#10B981' }]}>
+              {profitChange < 0 ? '–' : '+'}£{Math.abs(profitChange).toLocaleString()}
+            </Text>
+          </View>
+        </View>
       )}
-      <Text style={s.promptGroup}>{insight.promptGroup}</Text>
+
+      {/* Competitor gainers */}
+      {gainers.length > 0 && (
+        <View style={s.section}>
+          <Text style={s.sectionLabel}>Who's entering</Text>
+          {gainers.slice(0, 3).map((g, i) => (
+            <View key={i} style={s.gainerRow}>
+              <Image source={{ uri: getFaviconUrl(g.domain) }} style={s.sourceFavicon} />
+              <Text style={s.sourceDomain} numberOfLines={1}>{g.domain}</Text>
+              {g.before === 0 && (
+                <View style={s.newBadge}>
+                  <Text style={s.newBadgeText}>NEW</Text>
+                </View>
+              )}
+              <Text style={[s.gainerDelta, { color: '#10B981' }]}>+{g.delta}pp</Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
 
-// ==================== PPC MEDIUM ====================
 export function PPCMediumCard({ insight }) {
   const rivals = parseRivals(insight.summary);
   return (
@@ -250,16 +212,6 @@ export function PPCMediumCard({ insight }) {
   );
 }
 
-// ==================== FALLBACK ====================
-export function FallbackCard({ insight }) {
-  return (
-    <View style={s.container}>
-      <Text style={s.fallbackText}>{insight.summary}</Text>
-      <Text style={s.promptGroup}>{insight.promptGroup}</Text>
-    </View>
-  );
-}
-
 // ==================== ROUTER ====================
 export default function InsightCardVisual({ insight }) {
   if (insight.type === 'ppc') {
@@ -267,68 +219,53 @@ export default function InsightCardVisual({ insight }) {
       ? <PPCHighCard insight={insight} />
       : <PPCMediumCard insight={insight} />;
   }
-  switch (insight.insightType) {
-    case 'Invisible':
-      return <InvisibleCard insight={insight} />;
-    case 'At Risk':
-      if (insight.title.includes('Cautionary'))
-        return <AtRiskCautionaryCard insight={insight} />;
-      return <AtRiskCompetitiveCard insight={insight} />;
-    default:
-      return <FallbackCard insight={insight} />;
-  }
+  return <AISearchCard insight={insight} />;
 }
 
 // ==================== STYLES ====================
 const s = StyleSheet.create({
-  container: { alignItems: 'center', paddingVertical: 4 },
+  container: { paddingVertical: 4 },
 
-  // Hero prompt (Invisible card)
-  heroPrompt: { fontFamily: F, fontSize: 18, fontWeight: '600', color: colors.navy, textAlign: 'center', marginBottom: 6 },
+  // Summary text
+  summaryText: { fontFamily: F, fontSize: 12, color: lt.body, lineHeight: 18, marginBottom: 6, paddingHorizontal: 2 },
 
-  // Muted description line
-  mutedLine: { fontFamily: F, fontSize: 12, color: lt.bodyLight, textAlign: 'center', lineHeight: 18, marginBottom: 8 },
+  // Section headers
+  section: { width: '100%', marginTop: 8 },
+  sectionLabel: { fontFamily: F, fontSize: 9, fontWeight: '700', color: lt.bodyLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
 
-  // Sections
-  section: { width: '100%', marginTop: 6 },
-  sectionLabel: { fontFamily: F, fontSize: 9, fontWeight: '700', color: lt.bodyLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  // Source list (vertical rows)
+  sourceRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, gap: 8 },
+  sourceFavicon: { width: 20, height: 20, borderRadius: 4, backgroundColor: '#F0F0F0' },
+  sourceDomain: { fontFamily: F, fontSize: 12, color: lt.headline, fontWeight: '500', flex: 1 },
+  sourceCount: { fontFamily: F, fontSize: 12, fontWeight: '700', color: lt.headline, minWidth: 28, textAlign: 'right' },
 
-  // Brand avatars
-  avatarRow: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
-  avatar: { backgroundColor: colors.navy, alignItems: 'center', justifyContent: 'center' },
-  avatarLetter: { fontFamily: F, fontWeight: '700', color: '#FFFFFF' },
-  avatarName: { fontFamily: F, fontSize: 10, color: lt.bodyLight, marginTop: 3, textAlign: 'center' },
-  avatarCount: { fontFamily: F, fontSize: 11, fontWeight: '600', color: lt.headline, marginTop: 1 },
+  // Brand chips (horizontal wrap)
+  brandGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  brandChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3EE', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 4, gap: 5 },
+  brandChipLogo: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#E5E7EB' },
+  brandChipInitial: { width: 16, height: 16, borderRadius: 8, backgroundColor: colors.navy, alignItems: 'center', justifyContent: 'center' },
+  brandChipInitialText: { fontFamily: F, fontSize: 8, fontWeight: '700', color: '#FFFFFF' },
+  brandChipName: { fontFamily: F, fontSize: 11, color: lt.headline, fontWeight: '500', maxWidth: 90 },
+  brandChipCount: { fontFamily: F, fontSize: 11, fontWeight: '700', color: lt.bodyLight },
 
-  // Framing bar
-  framingBar: { flexDirection: 'row', width: '100%', height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 10 },
-  framingSegment: { height: 6 },
+  // Expand/collapse button
+  moreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 6, paddingVertical: 4 },
+  moreBtnText: { fontFamily: F, fontSize: 11, color: lt.bodyLight, fontWeight: '500' },
 
-  // Stat pair
-  statPair: { flexDirection: 'row', justifyContent: 'center', gap: 32, marginBottom: 8 },
-  statItem: { alignItems: 'center' },
-  statNumber: { fontFamily: F, fontSize: 20, fontWeight: '700' },
-  statLabel: { fontFamily: F, fontSize: 10, color: lt.bodyLight, marginTop: 1 },
-
-  // Versus layout
-  versusRow: { flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 8 },
-  versusItem: { flex: 1, alignItems: 'center' },
-  versusDivider: { width: 1, height: 40, backgroundColor: '#E5E7EB' },
-  versusStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
-  versusStatus: { fontFamily: F, fontSize: 10, fontWeight: '600' },
-
-  // PPC
+  // PPC styles
   ppcLabel: { fontFamily: F, fontSize: 11, fontWeight: '600', color: lt.bodyLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   ppcBeforeAfter: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 8 },
   ppcBefore: { fontFamily: F, fontSize: 16, fontWeight: '500', color: lt.bodyLight },
   ppcArrow: { fontFamily: F, fontSize: 14, color: lt.bodyLight },
   ppcAfter: { fontFamily: F, fontSize: 24, fontWeight: '800' },
+  ppcProfitAfter: { fontFamily: F, fontSize: 18, fontWeight: '700' },
   rivalLine: { fontFamily: F, fontSize: 11, color: lt.bodyLight, textAlign: 'center', lineHeight: 16, marginBottom: 6 },
   rivalName: { color: lt.body },
-
-  // Fallback
-  fallbackText: { fontFamily: F, fontSize: 12, color: lt.body, lineHeight: 18, textAlign: 'center' },
-
-  // Common
   promptGroup: { fontFamily: F, fontSize: 11, fontStyle: 'italic', color: lt.bodyLight, marginTop: 4 },
+
+  // Competitor gainer rows
+  gainerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, gap: 8 },
+  gainerDelta: { fontFamily: F, fontSize: 12, fontWeight: '700', minWidth: 45, textAlign: 'right' },
+  newBadge: { backgroundColor: '#DBEAFE', borderRadius: radius.full, paddingHorizontal: 6, paddingVertical: 1 },
+  newBadgeText: { fontFamily: F, fontSize: 9, fontWeight: '700', color: '#2563EB', letterSpacing: 0.5 },
 });

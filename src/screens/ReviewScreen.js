@@ -1,18 +1,27 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme/colors';
 import { useWorkflows } from '../context/WorkflowsContext';
+import * as Clipboard from 'expo-clipboard';
 
 const IS_WEB = Platform.OS === 'web';
 const FONT_FAMILY = IS_WEB ? '"Montserrat", system-ui, sans-serif' : undefined;
 
-function copyToClipboard(text) {
-  if (IS_WEB && navigator?.clipboard) {
-    navigator.clipboard.writeText(text);
+async function copyToClipboard(text) {
+  try {
+    if (IS_WEB && navigator?.clipboard) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      await Clipboard.setStringAsync(text);
+    }
+    return true;
+  } catch (e) {
+    console.warn('Copy failed:', e);
+    return false;
   }
 }
 
@@ -23,10 +32,12 @@ function DeliverableCard({ workflow, onMarkReviewed }) {
   const isReviewed = workflow.status === 'approved';
   const del = workflow.deliverable;
 
-  const handleCopy = useCallback(() => {
-    copyToClipboard(`${del.title}\n\n${del.body}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = useCallback(async () => {
+    const success = await copyToClipboard(del.body);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   }, [del]);
 
   return (
@@ -48,30 +59,23 @@ function DeliverableCard({ workflow, onMarkReviewed }) {
       </View>
 
       {/* Title */}
-      <TouchableOpacity onPress={() => setExpanded((p) => !p)} activeOpacity={0.7}>
-        <View style={styles.titleRow}>
-          <Ionicons name="document-text" size={18} color={colors.lime} />
-          <Text style={styles.deliverableTitle}>{del.title}</Text>
-          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
-        </View>
-      </TouchableOpacity>
+      <View style={styles.titleRow}>
+        <Ionicons name="document-text" size={18} color={colors.lime} />
+        <Text style={styles.deliverableTitle}>{del.title}</Text>
+      </View>
 
       {/* Prompt group */}
       <Text style={styles.promptGroup}>{workflow.promptGroup}</Text>
 
       {/* Action buttons — always visible */}
       <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.actionBtn} onPress={handleCopy} activeOpacity={0.7}>
-          <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={14} color={colors.lime} />
-          <Text style={styles.actionBtnText}>{copied ? 'Copied!' : 'Copy'}</Text>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => setExpanded((p) => !p)} activeOpacity={0.7}>
+          <Text style={styles.actionBtnText}>{expanded ? 'Hide recommendation' : 'View recommendation'}</Text>
+          <Ionicons name={expanded ? 'arrow-up' : 'arrow-down'} size={12} color={colors.lime} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
-          <Ionicons name="share-outline" size={14} color={colors.lime} />
-          <Text style={styles.actionBtnText}>Share</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
-          <Ionicons name="mail-outline" size={14} color={colors.lime} />
-          <Text style={styles.actionBtnText}>Email</Text>
+        <TouchableOpacity style={[styles.actionBtn, copied && styles.actionBtnCopied]} onPress={handleCopy} activeOpacity={0.7}>
+          <Ionicons name={copied ? 'checkmark-circle' : 'copy-outline'} size={14} color={copied ? '#fff' : colors.lime} />
+          <Text style={[styles.actionBtnText, copied && styles.actionBtnCopiedText]}>{copied ? 'Copied ✓' : 'Copy'}</Text>
         </TouchableOpacity>
         {!isReviewed && (
           <TouchableOpacity style={styles.actionBtnReview} onPress={() => onMarkReviewed(workflow.id)} activeOpacity={0.7}>
@@ -86,21 +90,32 @@ function DeliverableCard({ workflow, onMarkReviewed }) {
           {del.body.split('\n\n').map((paragraph, idx) => {
             const trimmed = paragraph.trim();
             if (!trimmed) return null;
-            if (trimmed === trimmed.toUpperCase() && trimmed.length < 60 && !trimmed.includes('£') && !trimmed.includes('%')) {
-              return null;
-            }
+            // Split paragraph into lines — first line may be a section title
             const lines = trimmed.split('\n');
-            if (lines.length === 1 && !trimmed.endsWith('.') && !trimmed.endsWith(')') && trimmed.length < 80 && !trimmed.startsWith('-') && !trimmed.match(/^\d+\./)) {
-              return <Text key={idx} style={styles.sectionTitle}>{trimmed}</Text>;
+            const firstLine = lines[0].trim();
+
+            // Skip "Target Prompt" section entirely (including the prompt text below it)
+            if (firstLine.toLowerCase().replace(/[*#]/g, '').trim() === 'target prompt') return null;
+            // Skip raw prompt lines
+            if (trimmed === workflow.promptGroup) return null;
+            const isFirstLineTitle = firstLine.length < 80 && !firstLine.endsWith('.') && !firstLine.endsWith(')') && !firstLine.startsWith('-') && !firstLine.match(/^\d+\./);
+
+            if (isFirstLineTitle && lines.length > 1) {
+              // First line is a title, rest is body
+              const bodyLines = lines.slice(1).join('\n').trim();
+              return (
+                <View key={idx}>
+                  <Text style={styles.sectionTitle}>{firstLine}</Text>
+                  {bodyLines ? <Text style={styles.bodyText}>{bodyLines}</Text> : null}
+                </View>
+              );
+            }
+            if (isFirstLineTitle && lines.length === 1) {
+              return <Text key={idx} style={styles.sectionTitle}>{firstLine}</Text>;
             }
             return <Text key={idx} style={styles.bodyText}>{trimmed}</Text>;
           })}
         </ScrollView>
-      )}
-
-      {/* Preview (collapsed) */}
-      {!expanded && (
-        <Text style={styles.previewText} numberOfLines={2}>{del.body}</Text>
       )}
 
       {/* Time */}
@@ -199,7 +214,7 @@ const styles = StyleSheet.create({
 
   // Content
   contentScroll: { maxHeight: 400, backgroundColor: colors.bgCardElevated, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm },
-  sectionTitle: { fontFamily: FONT_FAMILY, fontSize: 14, fontWeight: '700', color: colors.lime, marginTop: 12, marginBottom: 4 },
+  sectionTitle: { fontFamily: FONT_FAMILY, fontSize: 15, fontWeight: '800', color: colors.lime, marginTop: 16, marginBottom: 6, letterSpacing: 0.2 },
   bodyText: { fontFamily: FONT_FAMILY, fontSize: 13, color: colors.textPrimary, lineHeight: 20, marginBottom: 8 },
 
   // Actions — always visible
@@ -210,6 +225,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
   },
   actionBtnText: { fontFamily: FONT_FAMILY, fontSize: 11, fontWeight: '600', color: colors.lime },
+  actionBtnCopied: { backgroundColor: '#10B981', borderColor: '#10B981' },
+  actionBtnCopiedText: { color: '#fff' },
   actionBtnReview: {
     width: 36, alignItems: 'center', justifyContent: 'center',
     paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.lime,

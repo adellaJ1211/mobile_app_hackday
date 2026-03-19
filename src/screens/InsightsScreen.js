@@ -21,6 +21,8 @@ const arloImage = require('../../assets/arlo-waving.webp');
 
 // --- Headline mapping ---
 function getConversationalHeadline(insight) {
+  // Use bespoke headline if provided
+  if (insight.headline) return insight.headline;
   const pg = insight.promptGroup;
   if (insight.type === 'ppc') {
     return insight.insightType === 'Review'
@@ -53,7 +55,7 @@ function getConversationalHeadline(insight) {
   }
 }
 
-const swipeInsights = insights.filter((i) => i.severity === 'high' || i.severity === 'medium');
+const swipeInsights = insights.filter((i) => i.severity === 'high' || i.severity === 'medium' || i.severity === 'low');
 
 // ==================== ARLO BOBBING ====================
 function ArloBobbing({ size = 150 }) {
@@ -106,7 +108,8 @@ function GreetingScreen({ onStart, insightCount }) {
 }
 
 // ==================== COMPLETION SCREEN ====================
-function CompletionScreen({ workflowCount, onGoToWorkflows }) {
+function CompletionScreen({ workflowCount, reviewCount, onGoToReview, onGoToWorkflows }) {
+  const hasReviews = reviewCount > 0;
   return (
     <View style={styles.fullScreen}>
       <StatusBar barStyle="dark-content" />
@@ -116,9 +119,15 @@ function CompletionScreen({ workflowCount, onGoToWorkflows }) {
         <Text style={styles.completeSubtitle}>
           {workflowCount > 0 ? `${workflowCount} workflow${workflowCount !== 1 ? 's' : ''} started` : 'No workflows started yet'}
         </Text>
-        <TouchableOpacity style={[styles.pillBtn, { marginTop: 32 }]} onPress={onGoToWorkflows} activeOpacity={0.85}>
-          <Text style={styles.pillBtnText}>View workflows</Text>
-        </TouchableOpacity>
+        {hasReviews ? (
+          <TouchableOpacity style={[styles.pillBtn, { marginTop: 32 }]} onPress={onGoToReview} activeOpacity={0.85}>
+            <Text style={styles.pillBtnText}>Review results</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={[styles.pillBtn, { marginTop: 32 }]} onPress={onGoToWorkflows} activeOpacity={0.85}>
+            <Text style={styles.pillBtnText}>Check workflow progress</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -171,7 +180,19 @@ function InsightSwipeCard({ insight, index, total, onNext, onPrev, onNavigate, o
 
   const headline = getConversationalHeadline(insight);
   const isAISearch = insight.type === 'ai-search';
-  const severityColor = insight.severity === 'high' ? lt.severityHigh : lt.severityMedium;
+  // Insight type tag colour
+  const tagColorMap = {
+    'Content Gap': lt.severityHigh,
+    'Source Gap': lt.severityHigh,
+    'Competitive Threat': lt.severityMedium,
+    'Brand Attribution': '#3B82F6',
+    'Protect Position': '#10B981',
+    'Bid Adjustment': lt.severityMedium,
+  };
+  const insightTag = {
+    label: insight.insightLabel || insight.insightType,
+    color: tagColorMap[insight.insightLabel] || '#64748B',
+  };
 
   return (
     <Animated.View
@@ -192,10 +213,10 @@ function InsightSwipeCard({ insight, index, total, onNext, onPrev, onNavigate, o
                 {isAISearch ? 'AI Search' : 'PPC'}
               </Text>
             </View>
-            <View style={[styles.severityBadge, { backgroundColor: severityColor + '18' }]}>
-              <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
-              <Text style={[styles.severityBadgeText, { color: severityColor }]}>
-                {insight.severity === 'high' ? 'High' : 'Medium'}
+            <View style={[styles.severityBadge, { backgroundColor: insightTag.color + '18' }]}>
+              <View style={[styles.severityDot, { backgroundColor: insightTag.color }]} />
+              <Text style={[styles.severityBadgeText, { color: insightTag.color }]}>
+                {insightTag.label}
               </Text>
             </View>
           </View>
@@ -203,21 +224,28 @@ function InsightSwipeCard({ insight, index, total, onNext, onPrev, onNavigate, o
           <InsightCardVisual insight={insight} />
         </View>
 
-        {/* Workflow steps preview */}
+        {/* Workflow stepper */}
         {insight.workflowSteps && (
-          <View style={styles.stepsPreview}>
-            <Text style={styles.stepsPreviewLabel}>Arlo will:</Text>
+          <View style={styles.workflowPreview}>
+            <Text style={styles.workflowLabel}>Workflow</Text>
             {insight.workflowSteps.map((step, idx) => (
-              <View key={idx} style={styles.stepPreviewRow}>
-                <Text style={styles.stepPreviewNumber}>{idx + 1}</Text>
-                <Text style={styles.stepPreviewText} numberOfLines={1}>{step}</Text>
+              <View key={idx}>
+                <View style={styles.stepperRow}>
+                  <View style={styles.stepperCircle}>
+                    <Text style={styles.stepperNumber}>{idx + 1}</Text>
+                  </View>
+                  <Text style={styles.stepperText}>{step}</Text>
+                </View>
+                {idx < insight.workflowSteps.length - 1 && (
+                  <View style={styles.stepperLine} />
+                )}
               </View>
             ))}
           </View>
         )}
 
-        {/* Spacer to push button to bottom */}
-        <View style={{ flex: 1 }} />
+        {/* Spacer */}
+        <View style={{ flex: 1, minHeight: 8 }} />
 
         {/* Single CTA */}
         <View style={styles.cardButtonCol}>
@@ -245,7 +273,7 @@ export default function InsightsScreen({ navigation }) {
   const [phase, setPhase] = useState('greeting');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [agentInsight, setAgentInsight] = useState(null);
-  const { startWorkflow, hasWorkflow, workflowCount, approveWorkflow, getWorkflowByInsightId } = useWorkflows();
+  const { startWorkflow, hasWorkflow, workflowCount, reviewCount } = useWorkflows();
 
   const topPad = Math.max(insets.top, IS_WEB ? 40 : 0) + spacing.sm;
 
@@ -270,14 +298,17 @@ export default function InsightsScreen({ navigation }) {
     setAgentInsight(insight);
   }, [startWorkflow]);
 
-  const handleApprove = useCallback((insight) => {
+  const handleViewWorkflow = useCallback(() => {
     setAgentInsight(null);
-    const wf = getWorkflowByInsightId(insight.id);
-    if (wf) approveWorkflow(wf.id);
-  }, [approveWorkflow, getWorkflowByInsightId]);
+    navigation?.navigate?.('Workflows');
+  }, [navigation]);
 
   const handleGoToWorkflows = useCallback(() => {
     navigation?.navigate?.('Workflows');
+  }, [navigation]);
+
+  const handleGoToReview = useCallback(() => {
+    navigation?.navigate?.('Review');
   }, [navigation]);
 
   if (phase === 'greeting') {
@@ -291,7 +322,7 @@ export default function InsightsScreen({ navigation }) {
   if (phase === 'complete') {
     return (
       <View style={[styles.fullScreen, { paddingTop: topPad }]}>
-        <CompletionScreen workflowCount={workflowCount} onGoToWorkflows={handleGoToWorkflows} />
+        <CompletionScreen workflowCount={workflowCount} reviewCount={reviewCount} onGoToReview={handleGoToReview} onGoToWorkflows={handleGoToWorkflows} />
       </View>
     );
   }
@@ -318,8 +349,12 @@ export default function InsightsScreen({ navigation }) {
       <AgentModal
         visible={!!agentInsight}
         insight={agentInsight}
-        onClose={() => setAgentInsight(null)}
-        onApprove={handleApprove}
+        onClose={() => {
+          setAgentInsight(null);
+          // Auto-advance to next card after modal dismisses
+          handleNext();
+        }}
+        onViewWorkflow={handleViewWorkflow}
       />
     </View>
   );
@@ -370,13 +405,6 @@ const styles = StyleSheet.create({
   cardSummary: { fontFamily: FONT_FAMILY, fontSize: 13, color: lt.body, lineHeight: 19, marginBottom: 8 },
   cardPromptGroup: { fontFamily: FONT_FAMILY, fontSize: 12, fontStyle: 'italic', color: lt.bodyLight },
 
-  // Workflow steps preview
-  stepsPreview: { width: '100%', backgroundColor: lt.metricBg, borderRadius: radius.md, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.sm, marginBottom: 8 },
-  stepsPreviewLabel: { fontFamily: FONT_FAMILY, fontSize: 9, fontWeight: '700', color: lt.bodyLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5 },
-  stepPreviewRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
-  stepPreviewNumber: { fontFamily: FONT_FAMILY, fontSize: 10, fontWeight: '700', color: colors.blue, width: 14, textAlign: 'center', lineHeight: 16 },
-  stepPreviewText: { fontFamily: FONT_FAMILY, fontSize: 11, color: lt.body, lineHeight: 16, flex: 1 },
-
   // Stacked buttons
   cardButtonCol: { width: '100%', marginBottom: 14 },
   btnPrimaryFull: {
@@ -389,6 +417,15 @@ const styles = StyleSheet.create({
     paddingVertical: 14, borderRadius: radius.full, backgroundColor: lt.btnDark, opacity: 0.5,
   },
   btnDisabledFullText: { fontFamily: FONT_FAMILY, color: colors.lime, fontSize: 13, fontWeight: '700' },
+
+  // Workflow stepper
+  workflowPreview: { width: '100%', marginTop: 10 },
+  workflowLabel: { fontFamily: FONT_FAMILY, fontSize: 9, fontWeight: '700', color: lt.bodyLight, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  stepperCircle: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: lt.bodyLight, alignItems: 'center', justifyContent: 'center' },
+  stepperNumber: { fontFamily: FONT_FAMILY, fontSize: 11, fontWeight: '600', color: lt.bodyLight },
+  stepperText: { fontFamily: FONT_FAMILY, fontSize: 12, color: lt.body, flex: 1 },
+  stepperLine: { width: 1, height: 10, backgroundColor: lt.bodyLight, marginLeft: 12, opacity: 0.4 },
 
   // Nav arrows
   navArrowRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, paddingBottom: 6, paddingTop: 2 },
